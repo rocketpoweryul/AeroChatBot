@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aerospace Certification Chatbot</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        try {
+          console.log("Marked is loaded", marked.parse('Hello, **world**!'));
+        } catch (error) {
+          console.error("Marked is not loaded correctly");
+        }
+    </script>  
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #d0e7f9; /* Light blue background */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            justify-content: space-between;
+        }
+        header {
+            text-align: center;
+            padding: 20px;
+            font-size: 24px;
+            color: #005288;
+        }
+        #response {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin: 10px;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .user-message {
+            background-color: #d1eaff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .bot-message {
+            background-color: #bcd4e6;
+            text-align: left;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-wrap: break-word;
+        }
+        #chatbox {
+            display: flex;
+            padding: 10px;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 10px;
+            margin-right: 5px;
+            border: 2px solid #005288;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #005288;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #003354;
+        }
+    </style>
+</head>
+<body>
+    <header>Aerospace Certification Chatbot</header>
+    <div id="response"></div>
+    <div id="chatbox">
+        <input type="text" id="user-input" placeholder="Type your question here..." onkeypress="if(event.keyCode == 13) sendMessage();">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const inputElement = document.getElementById('user-input');
+            const input = inputElement.value;
+            const responseContainer = document.getElementById('response');
+
+            inputElement.value = '';  // Clear input after sending
+
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user-message';
+            userMessage.textContent = `You: ${input}`;
+            responseContainer.appendChild(userMessage);
+
+            const botMessage = document.createElement('div');
+            botMessage.className = 'message bot-message';
+            responseContainer.appendChild(botMessage);
+
+            let messageBuffer = '';  // Buffer to collect text chunks
+
+            fetch('/get_response', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: input })
+            }).then(response => {
+                const reader = response.body.getReader();
+
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            // When all chunks are read, parse and append final text
+                            botMessage.innerHTML = marked.parse(messageBuffer);
+                            return;
+                        }
+                        const text = new TextDecoder("utf-8").decode(value);
+                        messageBuffer += text;  // Accumulate chunks in buffer
+                        botMessage.innerHTML = marked.parse(messageBuffer);  // Update bot message content
+                        responseContainer.scrollTop = responseContainer.scrollHeight;  // Scroll to the latest message
+                        return pump();  // Continue pumping
+                    });
+                }
+
+                return pump();  // Start the streaming process
+            });
+        }
+    </script>
+</body>
+</html>
