@@ -1,20 +1,14 @@
-from flask import Flask, request, jsonify, render_template, Response
-from openai import OpenAI
-import openai
-import os
+from flask import Flask, request, render_template, Response
 import logging
-from prompts import *
+from openai_backend import *
+from prompts         import *
 
+
+# log for debugging
 logging.basicConfig(level=logging.DEBUG)
 
+# instantiate the flask app
 app = Flask(__name__)
-
-# Assuming you've set your API key in your environment variables
-openai.api_key = os.getenv('OPENAI_API_KEY')
-
-# create openai client and init history
-client = OpenAI()
-history = []
 
 @app.route('/')
 def index():
@@ -22,7 +16,6 @@ def index():
 
 @app.route('/get_response', methods=['POST'])
 def get_response():
-    global history  # Declare 'history' as global
     logging.debug("Received request with data: %s", request.json['message'])
     user_input = request.json['message']
 
@@ -33,7 +26,7 @@ def get_response():
 
     def generate():
         response = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-4o",
             messages=history,
             stream=True,
             temperature=0.1

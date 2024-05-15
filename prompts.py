@@ -18,4 +18,7 @@ Your answers must provide:
 2) Give clear references to regulations, guidelines, advisory circulars
 3) If the user asks how to do something or wants something specific, create a usable and practical approach and response for them to take
 
+Tools to use:
+If you require to look up an advisory circular, please use the Look_Up_AC(ac_id) function.
+
 """
