@@ -20,13 +20,10 @@ st.set_page_config(
 if "chat_history" not in ss:
     ss.chat_history = []
 
-if "messages" not in ss:
-    ss.messages = []
-
 st.title( "🛫:blue[Aerospace Certification] :red[Chatbot]" )
 
 # Display chat messages from history on app rerun
-for message in st.session_state.messages:
+for message in ss.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -36,7 +33,7 @@ if prompt := st.chat_input("Ask anything about aerospace certification!"):
     with st.chat_message("user"):
         st.markdown(prompt)
     # Add user message to app chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
     # send message to chat bot
     agent.add_user_prompt("user", prompt)
 
@@ -51,7 +48,8 @@ with st.chat_message("assistant"):
     
     # create the agent run
     assistant_reply = agent.stream_response(assistant_reply_box, assistant_reply)
+    print(assistant_reply)
 
     # Once the stream is over, update chat history
-    st.session_state.chat_history.append({"role": "assistant",
+    ss.chat_history.append({"role": "assistant",
                                           "content": assistant_reply})
