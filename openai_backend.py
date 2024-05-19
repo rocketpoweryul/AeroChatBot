@@ -1,85 +1,70 @@
-# get packages
+from dotenv import load_dotenv
 import openai
-import os
-
-from openai            import OpenAI
-from openai            import AssistantEventHandler
 from typing_extensions import override
+from openai import AssistantEventHandler
+from openai.types.beta.assistant_stream_event import ThreadMessageDelta
+from openai.types.beta.threads.text_delta_block import TextDeltaBlock 
 
-from agent_functions import *
-from prompts         import *
+# openai variables
+load_dotenv()
+client = openai.OpenAI()
+model = 'gpt-4o'
+assistant_id = 'asst_kQi8u6bDILpHc6NTXOJxXs6y'
 
-def create_assistant(): 
-    # make sure there is a .env file with the api key
-    openai.api_key = os.getenv('OPENAI_API_KEY')
+class Assistant:
+    thread_id = ""
 
-    # create openai client
-    client = OpenAI()
+    def __init__(self, model: str = model):
+        # openai variables
+        self.client    = client
+        self.model     = model
+        self.assistant = None
+        self.thread    = None
+        self.run       = None
+        self.summary   = None
 
-    # create assistant
-    assistant = client.beta.assistants.create(
-        name            = "Aerospace Certification Chatbot",
-        instructions    = aero_expert_sysmsg,
-        tools           = [fcn_call_tools],
-        model           = "gpt-4o"
-        )
-
-    thread = client.beta.threads.create
-
-    return assistant, thread
-
-def add_msg_to_thread(user_message, client, thread):
-    message = client.beta.threads.messages.create(
-        thread_id   = thread.id,
-        role        = "user",
-        content     = user_message
-        )
-
- 
-# First, we create a EventHandler class to define
-# how we want to handle the events in the response stream.
- 
-class EventHandler(AssistantEventHandler):
-    @override
-    def on_event(self, event):
-      # Retrieve events that are denoted with 'requires_action'
-      # since these will have our tool_calls
-      if event.event == 'thread.run.requires_action':
-        run_id = event.data.id  # Retrieve the run ID from the event data
-        self.handle_requires_action(event.data, run_id)
- 
-    def handle_requires_action(self, data, run_id):
-      tool_outputs = []
+        # retrieve existing assistant based on hardcoded data
+        self.assistant = self.client.beta.assistants.retrieve(
+            assistant_id=assistant_id
+            )
         
-      for tool in data.required_action.submit_tool_outputs.tool_calls:
-        if tool.function.name == "Look_Up_AC":
-          tool_args = JSON.parse(tool.function
-          output = Look_Up_AC
+        # create thread as this initialization only occurs on boot up of app
+        if Assistant.thread_id:
+            self.thread = self.client.beta.threads.retrieve(
+                thread_id = Assistant.thread_id
+            )
+        else:
+            self.thread = self.client.beta.threads.create()
+            Assistant.thread_id = self.thread.id
+      
+    def add_user_prompt(self, role, content):
+        if self.thread:
+            self.client.beta.threads.messages.create(
+                thread_id = self.thread.id,
+                role      = role,
+                content   = content
+            )
+
+    def stream_response(self, assistant_reply_box, assistant_reply):
+        run = client.beta.threads.runs.create(
+            assistant_id=self.assistant.id,
+            thread_id=self.thread.id,
+            stream=True
+        )
         
-      # Submit all tool_outputs at the same time
-      self.submit_tool_outputs(tool_outputs, run_id)
- 
-    def submit_tool_outputs(self, tool_outputs, run_id):
-      # Use the submit_tool_outputs_stream helper
-      with client.beta.threads.runs.submit_tool_outputs_stream(
-        thread_id=self.current_run.thread_id,
-        run_id=self.current_run.id,
-        tool_outputs=tool_outputs,
-        event_handler=EventHandler(),
-      ) as stream:
-        for text in stream.text_deltas:
-          print(text, end="", flush=True)
-        print()
- 
-# Then, we use the `stream` SDK helper 
-# with the `EventHandler` class to create the Run 
-# and stream the response.
- 
-with client.beta.threads.runs.stream(
-  thread_id=thread.id,
-  assistant_id=assistant.id,
-  instructions="Please address the user as Jane Doe. The user has a premium account.",
-  event_handler=EventHandler(),
-) as stream:
-  stream.until_done()
-    
+        # Iterate through the stream of events
+        for event in run:
+            # There are various types of streaming events
+            # See here: https://platform.openai.com/docs/api-reference/assistants-streaming/events
+
+            # Here, we only consider if there's a delta text
+            if isinstance(event, ThreadMessageDelta):
+                if isinstance(event.data.delta.content[0], TextDeltaBlock):
+                    # empty the container
+                    assistant_reply_box.empty()
+                    # add the new text
+                    assistant_reply += event.data.delta.content[0].text.value
+                    # display the new text
+                    assistant_reply_box.markdown(assistant_reply)
+        
+        return assistant_reply
