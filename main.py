@@ -4,23 +4,31 @@ from streamlit import session_state as ss
 # import modules
 from openai_backend import *
 
-# intialize agent
+# initialize agent
 if 'initialized' not in st.session_state:
     agent = Assistant()
     print(agent.assistant.id)
     print(agent.thread.id)
+    ss.initial_message_shown = False
 
 # Streamlit app configuration
 st.set_page_config(
-    page_title = "AeroCertChatBot",
-    page_icon  = "✈️",
+    page_title="AeroCertChatBot",
+    page_icon="✈️",
 )
 
 # variables
 if "chat_history" not in ss:
     ss.chat_history = []
 
-st.title( "🛫:blue[Aerospace Certification] :red[Chatbot]" )
+st.title("🛫:blue[Aerospace Certification] :red[Chatbot]")
+
+# Display initial message if not shown before
+if not ss.initial_message_shown:
+    initial_message = "Hello! I'm your Aerospace Certification Chatbot. How can I assist you today?"
+    with st.chat_message("assistant"):
+        st.markdown(initial_message)
+    ss.initial_message_shown = True
 
 # Display chat messages from history on app rerun
 for message in ss.chat_history:
@@ -37,19 +45,17 @@ if prompt := st.chat_input("Ask anything about aerospace certification!"):
     # send message to chat bot
     agent.add_user_prompt("user", prompt)
 
+    # Display assistant response in chat message container
+    with st.chat_message("assistant"):
+        # Empty container to display the assistant's reply
+        assistant_reply_box = st.empty()
+        
+        # A blank string to store the assistant's reply
+        assistant_reply = ""
+        
+        # create the agent run
+        assistant_reply = agent.stream_response(assistant_reply_box, assistant_reply)
+        print(assistant_reply)
 
-# Display assistant response in chat message container
-with st.chat_message("assistant"):
-    # Empty container to display the assistant's reply
-    assistant_reply_box = st.empty()
-    
-    # A blank string to store the assistant's reply
-    assistant_reply = ""
-    
-    # create the agent run
-    assistant_reply = agent.stream_response(assistant_reply_box, assistant_reply)
-    print(assistant_reply)
-
-    # Once the stream is over, update chat history
-    ss.chat_history.append({"role": "assistant",
-                                          "content": assistant_reply})
+        # Once the stream is over, update chat history
+        ss.chat_history.append({"role": "assistant", "content": assistant_reply})
