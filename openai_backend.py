@@ -116,7 +116,7 @@ class Assistant:
                                         # Handle different types of events
                                         for event in stream:
                                             if isinstance(event, ThreadMessageDelta):
-                                                print("MSG ThreadMessageDelta event data")  # Debug statement
+                                                print("TOOL ThreadMessageDelta event data")  # Debug statement
                                                 if isinstance(event.data.delta.content[0], TextDeltaBlock):
                                                     # add the new text
                                                     assistant_reply += event.data.delta.content[0].text.value
