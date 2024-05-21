@@ -1,10 +1,10 @@
 from dotenv import load_dotenv
 import openai
-from typing_extensions import override
-from openai import AssistantEventHandler
-from openai.types.beta.assistant_stream_event import ThreadMessageDelta, ThreadRunRequiresAction
+from openai.types.beta.assistant_stream_event import ThreadMessageDelta, ThreadRunRequiresAction, ThreadMessageInProgress, ThreadMessageCompleted, ThreadRunCompleted
 from openai.types.beta.threads.text_delta_block import TextDeltaBlock 
 from agent_functions import *
+import json
+import time
 
 # openai variables
 load_dotenv()
@@ -46,46 +46,103 @@ class Assistant:
                 content   = content
             )
 
-    def stream_response(self, assistant_reply_box, assistant_reply):
-        with client.beta.threads.runs.create(
-            assistant_id=self.assistant.id,
-            thread_id=self.thread.id,
-            stream=True
-        ) as stream:
-            # Iterate through the stream of events
-            for event in stream:
-                # Retrieve the list of runs
-                runs_page = self.client.beta.threads.runs.list(thread_id=self.thread.id)
+    def stream_response(self, assistant_reply_box):
+        try:
+            with client.beta.threads.runs.create(
+                assistant_id=self.assistant.id,
+                thread_id=self.thread.id,
+                stream=True
+            ) as stream:
+                assistant_reply = ""
+                start_time = time.time()
+                max_duration = 120  # Maximum duration in seconds for streaming
 
-                # Convert the SyncCursorPage to a list (if possible) or iterate over it
-                runs = list(runs_page.data)
+                # Iterate through the stream of events
+                for event in stream:
+                    print("Event received!")  # Debug statement
 
-                # Check if the list is not empty
-                if runs:
-                    # Get the first run
-                    run = runs[0]
-                    
-                    # Check if the run has an id attribute
-                    if hasattr(run, 'id'):
-                        run_id = run.id
-                    else:
-                        print("Error: The run object does not have an 'id' attribute.")
-                else:
-                    print("Error: No runs found.")
+                    # Check if the maximum duration has been exceeded
+                    if time.time() - start_time > max_duration:
+                        print("Stream timeout exceeded.")
+                        break
 
+                    # Handle different types of events
+                    if isinstance(event, ThreadMessageDelta):
+                        print("ThreadMessageDelta event data")  # Debug statement
+                        if isinstance(event.data.delta.content[0], TextDeltaBlock):
+                            # add the new text
+                            assistant_reply += event.data.delta.content[0].text.value
+                            # display the new text
+                            assistant_reply_box.markdown(assistant_reply)
 
-                # Here, we only consider if there's a delta text
-                if isinstance(event, ThreadMessageDelta):
-                    if isinstance(event.data.delta.content[0], TextDeltaBlock):
-                        # empty the container
-                        assistant_reply_box.empty()
-                        # add the new text
-                        assistant_reply += event.data.delta.content[0].text.value
-                        # display the new text
-                        assistant_reply_box.markdown(assistant_reply)
-                if isinstance(event, ThreadRunRequiresAction):
-                    pass
-                
-                
-        
-        return assistant_reply
+                    elif isinstance(event, ThreadRunRequiresAction):
+                        print("ThreadRunRequiresAction event data")  # Debug statement
+
+                        # Get required actions
+                        runs_page = self.client.beta.threads.runs.list(thread_id=self.thread.id)
+                        runs = list(runs_page.data)
+                        if runs:
+                            run = runs[0]
+                            run_id = run.id if hasattr(run, 'id') else None
+
+                            if run_id:
+                                required_actions = run.required_action.submit_tool_outputs.model_dump()
+                                tool_outputs = []
+
+                                # Loop through actions
+                                for action in required_actions["tool_calls"]:
+                                    # Identify function and params
+                                    func_name = action["function"]["name"]
+                                    arguments = json.loads(action["function"]["arguments"])
+                                    print(f"Executing function: {func_name} with arguments: {arguments}")  # Debug statement
+
+                                    # Run the agent function caller
+                                    output = execute_required_function(func_name, arguments)
+                                    print(f"Function {func_name} complete")  # Debug statement
+
+                                    # Create the tool outputs
+                                    tool_outputs.append({"tool_call_id": action["id"], "output": str(output)})
+
+                                # Submit the outputs
+                                if tool_outputs:
+                                    self.client.beta.threads.runs.submit_tool_outputs(
+                                        run_id=run_id,
+                                        thread_id=self.thread.id,
+                                        tool_outputs=tool_outputs,
+                                        stream=True
+                                    )
+                                    print("Tool outputs submitted")  # Debug statement
+                                
+                                # Wait for the tool outputs to be processed
+                                while True:
+                                    run_status = self.client.beta.threads.runs.retrieve(thread_id=self.thread.id,run_id=run_id)
+                                    if run_status.status == "completed":
+                                        print("Waiting complete")
+                                        break
+                                    print("Waiting for tool outputs to be processed...")
+                                    time.sleep(2)  # Check every 2 seconds
+                                
+                                messages = self.client.beta.threads.messages.list(thread_id=self.thread.id)
+                                # just get the last message of the thread
+                                last_message = messages.data[0]
+                                assistant_reply += last_message.content[0].text.value
+                                assistant_reply_box.markdown(assistant_reply)
+                                
+
+                    elif isinstance(event, ThreadMessageInProgress):
+                        print("ThreadMessageInProgress event received")  # Debug statement
+                        time.sleep(1)
+
+                    elif isinstance(event, ThreadMessageCompleted):
+                        print("Message completed.")  # Debug statement
+
+                    elif isinstance(event, ThreadRunCompleted):
+                        print("Run completed.")  # Debug statement
+
+                    print("Loop iteration completed.")  # Debug statement to check loop progress
+
+                return assistant_reply
+
+        except Exception as e:
+            print("An error occurred during streaming: ", str(e))
+            return "An error occurred while processing your request."

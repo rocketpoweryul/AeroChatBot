@@ -1,5 +1,9 @@
 import requests
 
+def execute_required_function(func_name, arguments):
+    if func_name == "get_FAA_regulation":
+        return get_FAA_regulation(arguments['regulation'])
+
 def get_FAA_regulation(regulation):
     base_url = "https://www.ecfr.gov/api"
     
@@ -29,7 +33,7 @@ def get_FAA_regulation(regulation):
     params = {
         'query': regulation,
         'agency_slugs[]': faa_slug,
-        'per_page': 10,  # Limiting to 10 results for brevity
+        'per_page': 3,  # Limiting to 10 results for brevity
         'page': 1
     }
     response = requests.get(search_url, params=params)
