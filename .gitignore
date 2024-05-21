@@ -1,1 +1,6 @@
+__pycache__
+.conda
+docs
 .env
+prompts.py
+test.py
