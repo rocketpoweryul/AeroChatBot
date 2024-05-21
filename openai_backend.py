@@ -68,7 +68,7 @@ class Assistant:
 
                     # Handle different types of events
                     if isinstance(event, ThreadMessageDelta):
-                        print("ThreadMessageDelta event data")  # Debug statement
+                        print("MSG ThreadMessageDelta event data")  # Debug statement
                         if isinstance(event.data.delta.content[0], TextDeltaBlock):
                             # add the new text
                             assistant_reply += event.data.delta.content[0].text.value
@@ -105,29 +105,23 @@ class Assistant:
 
                                 # Submit the outputs
                                 if tool_outputs:
-                                    self.client.beta.threads.runs.submit_tool_outputs(
-                                        run_id=run_id,
+                                    print("Tool output acquired")
+                                    with client.beta.threads.runs.submit_tool_outputs(
                                         thread_id=self.thread.id,
+                                        run_id=run_id,
                                         tool_outputs=tool_outputs,
-                                        stream=True
-                                    )
-                                    print("Tool outputs submitted")  # Debug statement
-                                
-                                # Wait for the tool outputs to be processed
-                                while True:
-                                    run_status = self.client.beta.threads.runs.retrieve(thread_id=self.thread.id,run_id=run_id)
-                                    if run_status.status == "completed":
-                                        print("Waiting complete")
-                                        break
-                                    print("Waiting for tool outputs to be processed...")
-                                    time.sleep(2)  # Check every 2 seconds
-                                
-                                messages = self.client.beta.threads.messages.list(thread_id=self.thread.id)
-                                # just get the last message of the thread
-                                last_message = messages.data[0]
-                                assistant_reply += last_message.content[0].text.value
-                                assistant_reply_box.markdown(assistant_reply)
-                                
+                                        stream = True
+                                    ) as stream:
+                                        print("Streaming response to tool output...")
+                                        # Handle different types of events
+                                        for event in stream:
+                                            if isinstance(event, ThreadMessageDelta):
+                                                print("MSG ThreadMessageDelta event data")  # Debug statement
+                                                if isinstance(event.data.delta.content[0], TextDeltaBlock):
+                                                    # add the new text
+                                                    assistant_reply += event.data.delta.content[0].text.value
+                                                    # display the new text
+                                                    assistant_reply_box.markdown(assistant_reply)
 
                     elif isinstance(event, ThreadMessageInProgress):
                         print("ThreadMessageInProgress event received")  # Debug statement
