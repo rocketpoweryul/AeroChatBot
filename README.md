@@ -1,6 +1,6 @@
 # Aerospace Certification Chatbot
 
-![image](https://github.com/rocketpoweryul/AeroChatBot/assets/5898307/e5967900-a696-4da2-8ace-88fe4867bd70)
+![image](https://github.com/rocketpoweryul/AeroChatBot/assets/5898307/524510da-c0d2-485a-b3ea-40e3a93dc7e4)
 
 Intention is to create a chatbot that can use an LLM augmented with widely available resources supporting type certification of aircraft.
 
